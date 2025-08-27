@@ -12,6 +12,9 @@
   <a href="https://huggingface.co/collections/a8cheng/navila-legged-robot-vision-language-action-model-for-naviga-67cfc82b83017babdcefd4ad">
     <img src="https://img.shields.io/badge/Huggingface-FFD63A?style=for-the-badge&logo=huggingface&labelColor=555555" alt="Huggingface"/>
   </a>
+  <a href="https://github.com/AnjieCheng/NaVILA">
+    <img src="https://img.shields.io/badge/VLA%20Code%20-FFA955?style=for-the-badge&logo=github&labelColor=555555" alt="VLA Code"/>
+  </a>
   <a href="https://github.com/yang-zj1026/legged-loco">
     <img src="https://img.shields.io/badge/Locomotion%20Code%20-FFA955?style=for-the-badge&logo=github&labelColor=555555" alt="Locomotion Code"/>
   </a>
