@@ -162,13 +162,13 @@ gpu_max_particle_contacts: int = 2**16
 ```
 
 ## Citation
-If you use VLN-CE-Isaac in your work please consider citing our paper:
+If you use NaVILA-Bench in your work please consider citing our paper:
 ```
 @article{cheng2024navila,
   title={NaVILA: Legged Robot Vision-Language-Action Model for Navigation},
-  author={Cheng, An-Chieh and Ji, Yandong and Yang, Zhaojing and Zou, Xueyan and Kautz, Jan and B{\i}y{\i}k, Erdem and Yin, Hongxu and Liu, Sifei and Wang, Xiaolong},
-  journal={arXiv preprint arXiv:2412.04453},
-  year={2024}
+  author={Cheng, An-Chieh and Ji, Yandong and Yang, Zhaojing and Gongye, Zaitian and Zou, Xueyan and Kautz, Jan and B{\i}y{\i}k, Erdem and Yin, Hongxu and Liu, Sifei and Wang, Xiaolong},
+  journal={Robotics: Science and Systems (RSS)},
+  year={2025}
 }
 ```
 
