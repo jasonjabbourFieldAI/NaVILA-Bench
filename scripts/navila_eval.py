@@ -15,7 +15,7 @@ import math
 import torch
 import numpy as np
 import imageio
-from PIL import Image
+# from PIL import Image
 import time
 import base64
 import io
@@ -84,7 +84,7 @@ from omni.isaac.vlnce.utils.eval_utils import (
     InstructionData, 
 )
 from omni.isaac.vlnce.utils.measures import PathLength, DistanceToGoal, Success, SPL, OracleNavigationError, OracleSuccess, MeasureManager
-
+from PIL import Image
 
 def quat2eulers(q0, q1, q2, q3):
     """
