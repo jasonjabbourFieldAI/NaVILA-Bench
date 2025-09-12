@@ -20,6 +20,7 @@ if __name__ == "__main__":
     parser.add_argument("--task", type=str, default="go2_matterport_vision")
     parser.add_argument("--low_level_policy_dir", type=str, default="2024-09-25_23-22-02")
     parser.add_argument("--start-idx", type=int, default=0)
+    parser.add_argument("--num-episodes", type=int, default=100)
     args = parser.parse_args()
     
     # Define the arguments for evaluation
@@ -33,6 +34,8 @@ if __name__ == "__main__":
         eval_args.append("--history_length=9")
 
     episodes = read_episodes(args.r2r_data_path)
+
+    count = 0 
 
     for i in range(args.start_idx, len(episodes)):
         episode = episodes[i]
@@ -48,3 +51,7 @@ if __name__ == "__main__":
         
         eval_args.append(f"--episode_idx={i}")
         subprocess.run(['python', 'scripts/navila_eval.py'] + eval_args)
+
+        count += 1
+        if count >= args.num_episodes:
+            break

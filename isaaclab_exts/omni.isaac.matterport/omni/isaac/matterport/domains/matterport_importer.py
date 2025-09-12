@@ -143,6 +143,9 @@ class MatterportImporter(TerrainImporter):
             prim_path=self.cfg.prim_path + "/Matterport", translation=(0.0, 0.0, 0.0), usd_path=base_path + ".usd"
         )
 
+        # Add collision to matterport
+        # self.enable_matterport_collision(self._xform_prim.GetPath().pathString)
+
         # apply collider properties
         collider_cfg = sim_utils.CollisionPropertiesCfg(collision_enabled=True)
         sim_utils.define_collision_properties(self._xform_prim.GetPrimPath(), collider_cfg)
@@ -159,3 +162,26 @@ class MatterportImporter(TerrainImporter):
             ground_plane = ground_plane_cfg.func("/World/GroundPlane", ground_plane_cfg)
             ground_plane.visible = False
         return
+
+    # def enable_matterport_collision(self, root_prim="/World/matterport/Matterport"):
+    #     from pxr import Usd, UsdGeom, UsdPhysics, PhysxSchema, Sdf
+    #     import omni.usd
+
+    #     stage = stage_utils.get_current_stage()
+    #     count = 0
+    #     root_path = self._xform_prim.GetPath().pathString + "/mesh"
+    #     print("ROOT PATH:", root_path)
+    #     for prim in stage.Traverse():
+    #         print("IS USDGEOM MESH?", prim.IsA(UsdGeom.Mesh), "PATH:", prim.GetPath())
+    #         if prim.IsA(UsdGeom.Mesh):
+    #             UsdPhysics.CollisionAPI.Apply(prim)
+    #             UsdPhysics.RigidBodyAPI.Apply(prim)
+    #             prim.CreateAttribute("physics:rigidBodyEnabled", Sdf.ValueTypeNames.Bool).Set(True)
+    #             prim.CreateAttribute("physics:kinematicEnabled", Sdf.ValueTypeNames.Bool).Set(True)
+    #             prim.CreateAttribute("physics:collisionEnabled", Sdf.ValueTypeNames.Bool).Set(True)
+    #             prim.CreateAttribute("physics:collisionApproximation", Sdf.ValueTypeNames.Token).Set("triangleMesh")
+
+    #             print(f"[INFO] Enabled static triangleMesh collision on: {prim.GetPath()}")
+    #             count += 1
+
+    #     print(f"[INFO] Total Matterport mesh prims patched with collisions: {count}")

@@ -1,9 +1,11 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 from numpy import ndarray
+import torch
 
 import numpy as np
 from scipy.spatial import KDTree
 
+FORCE_THRESHOLD = 1e-3  # Threshold to consider a collision has occurred
 
 def euclidean_distance(
     pos_a: Union[List[float], ndarray], pos_b: Union[List[float], ndarray]
@@ -324,6 +326,66 @@ class OracleSuccess(Measure):
         d = self.measure_manager.measures[DistanceToGoal.cls_uuid].get_metric()
         self._metric = float(self._metric or d < self._success_distance)
 
+
+class CollisionCount(Measure):
+    """Count how many collisions have occurred during an episode."""
+
+    cls_uuid: str = "collisions_count"
+
+    def __init__(self, env, episode, measure_manager, *args, **kwargs):
+        super().__init__(env, episode)
+        self.measure_manager = measure_manager
+
+    def _get_uuid(self, *args, **kwargs) -> str:
+        return self.cls_uuid
+
+    def reset_metric(self, *args, **kwargs) -> None:
+        self._metric = 0
+
+    def update_metric(self, *args, **kwargs) -> None:
+        # ONLY FOR ONE ENV
+        contact_forces = self._env.unwrapped.scene["contact_forces"].data.net_forces_w[0]  # [num_bodies, 3]
+        body_names = self._env.unwrapped.scene["contact_forces"].body_names
+
+        # print(self._env.unwrapped.scene["height_scanner"].data)
+        # height_map = self._env.unwrapped.scene["height_scanner"].data.height_map[0].cpu().numpy()
+    
+        for name, force in zip(body_names, contact_forces):
+            # print(f"Contact Force - Body: {name}, Force: {force.cpu().numpy()}")
+            mag = torch.norm(force).item()
+            if mag > FORCE_THRESHOLD:
+                # Count it and log it
+                self._metric += 1
+                print(f"[Collision] Body: {name}, Force: {force.cpu().numpy()}, |F|={mag:.4f}")
+            
+
+class CollisionOccurred(Measure):
+    """Whether a collision has occurred at least once in the episode."""
+
+    cls_uuid: str = "collision_occurred"
+
+    def __init__(self, env, episode, measure_manager, *args, **kwargs):
+        super().__init__(env, episode)
+        self.measure_manager = measure_manager
+
+    def _get_uuid(self, *args, **kwargs) -> str:
+        return self.cls_uuid
+
+    def reset_metric(self, *args, **kwargs) -> None:
+        self._metric = False
+
+    def update_metric(self, *args, **kwargs) -> None:
+        if self._metric:
+            # Already true — keep it sticky
+            return
+
+        # Access contact forces FOR THE FIRST ENV ONLY
+        contact_forces = self._env.unwrapped.scene["contact_forces"].data.net_forces_w[0]
+        mags = torch.norm(contact_forces, dim=-1)
+
+        # Flip to True if any body exceeds threshold
+        if torch.any(mags > FORCE_THRESHOLD):  # threshold can be tuned
+            self._metric = True
 
 def add_measurement(env, episode, measure_names=["PathLength", "DistanceToGoal", "Success", "SPL", "OracleNavigationError", "OracleSuccess"]):
     measure_manager = MeasureManager()

@@ -83,6 +83,7 @@ from omni.isaac.vlnce.utils.eval_utils import (
     add_instruction_on_img,
     InstructionData, 
 )
+from omni.isaac.lab.sensors import ContactSensorCfg
 from omni.isaac.vlnce.utils.measures import PathLength, DistanceToGoal, Success, SPL, OracleNavigationError, OracleSuccess, MeasureManager
 from PIL import Image
 
@@ -233,7 +234,6 @@ def sample_images_and_send_to_vlm(image_list, vlm_host, vlm_port, query):
         response = json.loads(response_data.decode())
         return response
 
-
 def main():
     """IsaacSim Evaluation using NaViLA and trained low-level policy."""
 
@@ -246,6 +246,11 @@ def main():
 
     # reset the position and rotation of the robot
     env_cfg = reset_start_pos_rot(env_cfg, args_cli, episode)
+
+    # Enable PhysX contact reporting on the robot
+    env_cfg.scene.robot.activate_contact_sensors = True
+
+    # print("Robot prim path:", env_cfg.scene.robot.prim_path)
 
     agent_cfg: RslRlOnPolicyRunnerCfg = cli_args.parse_rsl_rl_cfg(
         args_cli.task, args_cli, play=True
@@ -269,6 +274,7 @@ def main():
 
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode=None)
+
     # wrap around environment for rsl-rl
     if args_cli.history_length > 0:
         env = RslRlVecEnvHistoryWrapper(env, history_length=args_cli.history_length)
@@ -281,7 +287,7 @@ def main():
     print(f"[INFO]: Loading model checkpoint from: {resume_path}")
     policy = ppo_runner.get_inference_policy(device=env.unwrapped.device)
 
-    all_measures = ["PathLength", "DistanceToGoal", "Success", "SPL", "OracleNavigationError", "OracleSuccess"]
+    all_measures = ["PathLength", "DistanceToGoal", "Success", "SPL", "OracleNavigationError", "OracleSuccess", "CollisionCount", "CollisionOccurred"]
     env = VLNEnvWrapper(env, policy, args_cli.task, episode, high_level_obs_key="camera_obs",
                         measure_names=all_measures)
     
@@ -293,7 +299,7 @@ def main():
     cam_target = (robot_pos_w[0], robot_pos_w[1], robot_pos_w[2])
     # set the camera view
     env.unwrapped.sim.set_camera_view(eye=cam_eye, target=cam_target)
-    
+
     # step with zeros actions to get the initial frame
     obs, infos = env.reset()
 
@@ -313,6 +319,57 @@ def main():
     # vis_frame = cv2.rotate(vis_frame, cv2.ROTATE_90_CLOCKWISE)
     add_instruction_on_img(vis_frame, "")
     rgb_obses = [np.concatenate([init_frame, vis_frame], axis=1)]
+    
+    # Printing robot primitives for collisions
+    # print(sim_utils.find_matching_prim_paths("/World/envs/env_0/Robot/.*"))
+    # print(sim_utils.find_matching_prim_paths(f"{env.unwrapped.scene.env_regex_ns}/Robot"))
+    # ['/World/envs/env_0/Robot/left_hip_yaw_link', '/World/envs/env_0/Robot/joints', '/World/envs/env_0/Robot/left_hip_roll_link', '/World/envs/env_0/Robot/left_hip_pitch_link', '/World/envs/env_0/Robot/left_ankle_link', '/World/envs/env_0/Robot/right_hip_yaw_link', '/World/envs/env_0/Robot/right_hip_roll_link', '/World/envs/env_0/Robot/right_hip_pitch_link', '/World/envs/env_0/Robot/right_knee_link', '/World/envs/env_0/Robot/right_ankle_link', '/World/envs/env_0/Robot/torso_link', '/World/envs/env_0/Robot/left_shoulder_pitch_link', '/World/envs/env_0/Robot/left_shoulder_roll_link', '/World/envs/env_0/Robot/left_shoulder_yaw_link', '/World/envs/env_0/Robot/left_elbow_link', '/World/envs/env_0/Robot/right_shoulder_pitch_link', '/World/envs/env_0/Robot/right_shoulder_roll_link', '/World/envs/env_0/Robot/right_shoulder_yaw_link', '/World/envs/env_0/Robot/right_elbow_link', '/World/envs/env_0/Robot/pelvis', '/World/envs/env_0/Robot/left_knee_link']
+
+    # Dynamically attach directly to the scene
+    # env_cfg.scene.contact_forces = ContactSensorCfg(
+    #     prim_path="/World/envs/{ENV_REGEX_NS}/Robot/.*", #"/World/envs/{ENV_REGEX_NS}/Robot/.*_link",
+    #     update_period=0.0,
+    #     history_length=6,
+    #     debug_vis=False,
+    # )
+
+
+    from omni.isaac.lab.sim import schemas
+
+    from omni.isaac.lab.sim.schemas import CollisionPropertiesCfg, activate_contact_sensors
+
+    # Enable collisions on mesh
+    schemas.define_collision_properties(
+        prim_path="/World/matterport/Matterport/mesh",
+        cfg=CollisionPropertiesCfg(collision_enabled=True)
+    )
+
+    # Enable contact sensors on robot
+    activate_contact_sensors("/World/envs/env_0/Robot", threshold=0.0)
+
+
+    from pxr import Usd, UsdGeom, UsdPhysics, PhysxSchema, Sdf
+
+    # stage = env.unwrapped.sim.stage
+    # prim = stage.GetPrimAtPath("/World/matterport/Matterport/mesh")
+
+    # # # Apply rigid body (as static, non-kinematic)
+    # UsdPhysics.RigidBodyAPI.Apply(prim)
+    # prim.CreateAttribute("physics:rigidBodyEnabled", Sdf.ValueTypeNames.Bool).Set(True)
+    # prim.CreateAttribute("physics:kinematicEnabled", Sdf.ValueTypeNames.Bool).Set(False)  # static
+
+    # # Enable collisions
+    # UsdPhysics.CollisionAPI.Apply(prim)
+    # prim.CreateAttribute("physics:collisionEnabled", Sdf.ValueTypeNames.Bool).Set(True)
+    # prim.CreateAttribute("physics:collisionApproximation", Sdf.ValueTypeNames.Token).Set("convexHull")
+
+    # # Enable contact reporting
+    # PhysxSchema.PhysxContactReportAPI.Apply(prim)
+    # prim.CreateAttribute("physxContactReport:threshold", Sdf.ValueTypeNames.Float).Set(0.0)
+
+    # print("Has CollisionAPI:", prim.HasAPI(UsdPhysics.CollisionAPI))
+    # print("Has RigidBodyAPI:", prim.HasAPI(UsdPhysics.RigidBodyAPI))
+    # print("Has PhysxContactReportAPI:", prim.HasAPI(PhysxSchema.PhysxContactReportAPI))
 
     num_steps = 0
     target_steps = 0
