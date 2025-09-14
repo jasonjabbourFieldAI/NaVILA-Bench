@@ -50,6 +50,7 @@ if __name__ == "__main__":
         print(msg)
         
         eval_args.append(f"--episode_idx={i}")
+        eval_args.append(f"--tfrecord_path=navila_data/episode_{episode['episode_id']}.tfrecord")
         subprocess.run(['python', 'scripts/navila_eval.py'] + eval_args)
 
         count += 1

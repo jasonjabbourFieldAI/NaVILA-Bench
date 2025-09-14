@@ -21,6 +21,7 @@ import base64
 import io
 import socket
 import json
+# import tensorflow as tf
 
 from omni.isaac.lab.app import AppLauncher
 
@@ -45,7 +46,8 @@ parser.add_argument("--visualize_path", action="store_true", default=False, help
 parser.add_argument("--device", type=str, default="cuda")
 parser.add_argument("--vlm_host", type=str, default="localhost")
 parser.add_argument("--vlm_port", type=int, default=54321)
-
+parser.add_argument("--collect_data", action="store_true", default=False, help="Collect data and save to tfrecord.")
+parser.add_argument("--tfrecord_path", type=str, default="navila_data/episode_0.tfrecord")
 
 # r2r argparse arguments
 parser.add_argument("--episode_idx", type=int, default=0)
@@ -86,6 +88,8 @@ from omni.isaac.vlnce.utils.eval_utils import (
 from omni.isaac.lab.sensors import ContactSensorCfg
 from omni.isaac.vlnce.utils.measures import PathLength, DistanceToGoal, Success, SPL, OracleNavigationError, OracleSuccess, MeasureManager
 from PIL import Image
+
+episode_data = []
 
 def quat2eulers(q0, q1, q2, q3):
     """
@@ -156,6 +160,8 @@ def add_measurement(env, episode):
 
 
 def sample_images_and_send_to_vlm(image_list, vlm_host, vlm_port, query):
+    global episode_data
+
     if len(image_list) == 0:
         print("Did not receive any images.")
         return None
@@ -211,6 +217,9 @@ def sample_images_and_send_to_vlm(image_list, vlm_host, vlm_port, query):
         'query': query
     }
 
+    if args_cli.collect_data:
+        episode_data.append(request_data)
+
     # Send to VLM server
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((vlm_host, vlm_port))
@@ -234,6 +243,27 @@ def sample_images_and_send_to_vlm(image_list, vlm_host, vlm_port, query):
         response = json.loads(response_data.decode())
         return response
 
+    
+from tfrecord.writer import TFRecordWriter
+
+def save_episode_to_tfrecord(episode_data, tfrecord_path, episode_id):
+    os.makedirs(os.path.dirname(tfrecord_path), exist_ok=True)
+
+    writer = TFRecordWriter(tfrecord_path)
+
+    for step_idx, step in enumerate(episode_data):
+        img_bytes_list = [base64.b64decode(img_b64) for img_b64 in step["images"]]
+
+        features = {
+            "episode_id": (episode_id, "int"),
+            "step_id": (step_idx, "int"),
+            "language_instruction": (episode_data[0]["query"].encode(), "byte"),
+            "images": (img_bytes_list, "byte"),   # list of JPEGs
+        }
+        writer.write(features)
+
+    writer.close()
+    
 def main():
     """IsaacSim Evaluation using NaViLA and trained low-level policy."""
 
@@ -448,6 +478,10 @@ def main():
         writer.append_data(frame)
 
     writer.close()
+
+    if args_cli.collect_data:
+        save_episode_to_tfrecord(episode_data, args_cli.tfrecord_path, args_cli.episode_idx)
+        print(f"Saved episode data to {args_cli.tfrecord_path}")
 
     # close the simulator
     env.close()
