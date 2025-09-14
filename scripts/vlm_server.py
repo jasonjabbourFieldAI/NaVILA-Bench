@@ -35,6 +35,22 @@ class VLMServer:
         else:
             raise ValueError(f"Precision {self.args.precision} not supported")
 
+    
+        if self.args.pruned_inference:
+            FILTER_FOR = ['llm']  
+            SKIP_LAYERS = ['vision_tower', 'lm_head', 'projector']
+
+            # SKIP_LAYERS += ["." + str(i) + "." for i in range(0,6)]  # Skip first 16 layers of language model
+
+            from pruning_utils import attach_sparse_kernel, wrap_linears_with_svd
+            # print(SKIP_LAYERS)
+            # Attach sparse kernel
+            self.model = attach_sparse_kernel(self.model, filter_for=FILTER_FOR, skip_layers=SKIP_LAYERS)
+
+            # Load SVD factors and wrap linears
+            if self.args.svd_factors_path is not None:
+                self.model = wrap_linears_with_svd(self.model, self.args.svd_factors_path, filter_for=FILTER_FOR, skip_layers=SKIP_LAYERS, dtype=torch.bfloat16, device="cuda")
+
     def _disable_initializers(self):
         setattr(torch.nn.Linear, "reset_parameters", lambda self: None)
         setattr(torch.nn.LayerNorm, "reset_parameters", lambda self: None)
@@ -196,6 +212,9 @@ if __name__ == "__main__":
     parser.add_argument("--conv_mode", type=str, default="llama_3")
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--num_video_frames", type=int, default=8)
+    parser.add_argument("--pruned_inference", type=bool, default=False, help="If running the pruned model")
+    parser.add_argument("--svd_factors_path", type=str, required=False, help="Path to the SVD factors for pruned model")
+    
     args = parser.parse_args()
     
     server = VLMServer(args)
