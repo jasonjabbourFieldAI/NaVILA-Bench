@@ -39,8 +39,8 @@ PRUNING_MODIFIER = "Wanda"  # ["Wanda", "Magnitude", or "SparseGPT"]
 
 # Only one of these should be True at a time
 PRUNE_VISION_BACKBONE = False
-PRUNE_LANGUAGE_MODEL = True
-PRUNE_FULL_MODEL = False
+PRUNE_LANGUAGE_MODEL = False
+PRUNE_FULL_MODEL = True
 
 IGNORE_SPECIFIC_LANGUAGE_LAYERS = False 
 # Half are: list(range(0, 16)) or list(range(16, 32))
@@ -180,7 +180,7 @@ if __name__ == "__main__":
         pruner = WandaPruningModifier(
             targets="Linear",
             sparsity=0.5,
-            sequential_targets=["llm.model.layers"],  # For navile
+            sequential_targets=["llm.model.layers", "vision_tower", "mm_projector"],  # For navila
             mask_structure="2:4",
             ignore=ignore,
         )
