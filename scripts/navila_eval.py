@@ -88,8 +88,13 @@ from omni.isaac.vlnce.utils.eval_utils import (
 from omni.isaac.lab.sensors import ContactSensorCfg
 from omni.isaac.vlnce.utils.measures import PathLength, DistanceToGoal, Success, SPL, OracleNavigationError, OracleSuccess, MeasureManager
 from PIL import Image
+from collections import OrderedDict
+import pickle
+
 
 episode_data = []
+
+robot_link_log = []
 
 def quat2eulers(q0, q1, q2, q3):
     """
@@ -263,7 +268,50 @@ def save_episode_to_tfrecord(episode_data, tfrecord_path, episode_id):
         writer.write(features)
 
     writer.close()
-    
+
+
+
+def log_robot_state(env):
+    """
+    Collects all robot link positions and quaternions for the current timestep
+    and appends to the global robot_link_log list.
+
+    Args:
+        env: Isaac Gym environment wrapper (with scene["robot"])
+    """
+    global robot_link_log
+
+    robot_state = OrderedDict()
+    body_names = env.unwrapped.scene["robot"].data.body_names
+
+    for idx, link_name in enumerate(body_names):
+        pos = env.unwrapped.scene["robot"].data.body_pos_w[0, idx].detach().cpu().numpy().astype(np.float32)
+        quat = env.unwrapped.scene["robot"].data.body_quat_w[0, idx].detach().cpu().numpy().astype(np.float32)
+
+        # store [pos, quat] for this link
+        robot_state[link_name] = [pos, quat]
+
+    robot_link_log.append(robot_state)
+
+
+def save_robot_link_log(result_dir, episode_idx):
+    """
+    Saves the collected robot_link_log buffer to a pickle file.
+
+    Args:
+        result_dir (str): Directory to save log into
+        episode_idx (int): Episode index to name the file
+    """
+    global robot_link_log
+    os.makedirs(result_dir, exist_ok=True)
+
+    log_path = os.path.join(result_dir, f"robot_links_ep{episode_idx}.pkl")
+    with open(log_path, "wb") as f:
+        pickle.dump(robot_link_log, f)
+
+    print(f"[INFO] Saved robot link log to {log_path}")
+
+
 def main():
     """IsaacSim Evaluation using NaViLA and trained low-level policy."""
 
@@ -422,6 +470,9 @@ def main():
 
         obs, _, done, infos = env.step(torch.tensor(vlm_vel_commands, device = obs.device))
 
+        # Log robot state
+        log_robot_state(env)
+
         if done or env.is_stop_called or num_steps > max_episode_steps:
             break
 
@@ -482,6 +533,8 @@ def main():
     if args_cli.collect_data:
         save_episode_to_tfrecord(episode_data, args_cli.tfrecord_path, args_cli.episode_idx)
         print(f"Saved episode data to {args_cli.tfrecord_path}")
+
+    save_robot_link_log(result_dir, args_cli.episode_idx)
 
     # close the simulator
     env.close()
