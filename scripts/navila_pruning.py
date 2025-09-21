@@ -1,3 +1,12 @@
+# ---- Monkey Patch for SparseGPT ---------
+import transformers.modeling_utils as modeling_utils
+
+def safe_unwrap_model(model, *args, **kwargs):
+    return model  # skip DeepSpeed unwrap
+
+modeling_utils.unwrap_model = safe_unwrap_model
+# -----------------------------------------
+
 from llmcompressor.modifiers.pruning import WandaPruningModifier, MagnitudePruningModifier
 from llmcompressor.modifiers.obcq import SparseGPTModifier
 from llmcompressor import oneshot
@@ -196,6 +205,7 @@ if __name__ == "__main__":
         pruner = SparseGPTModifier(
             targets="Linear",
             sparsity=0.5,
+            sequential_targets=["llm", "vision_tower", "mm_projector"],
             mask_structure="2:4", 
             ignore=ignore,
         )
